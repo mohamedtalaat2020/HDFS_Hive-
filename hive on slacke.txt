@@ -1,0 +1,119 @@
+use IT;
+
+CREATE TABLE IF NOT EXISTS employees(
+emp_id int comment 'Unique employee id',
+first_name varchar(30),
+last_name varchar(30),
+department_id integer comment 'reference to department id',
+manager_id int,
+dire_date date
+)
+comment 'Employees Tables'
+tblproperties('created_by'='ahmed', 'created_on'='26-11-2021');
+
+
+INSERT INTO employees values(100,'ahmed','ibrahem',30, NULL,'2021-11-26');
+
+
+SELECT * FROM employees;
+
+DROP TABLE employees;
+
+
+
+CREATE TABLE departments (
+`department ID` INT,
+`department Name` STRING
+)
+comment 'Departments data'
+ROW FORMAT DELIMITED
+FIELDS TERMINATED BY ','
+LINES TERMINATED BY '\n'
+LOCATION '/inputdata/departments';
+
+SELECT * FROM departments;
+
+DROP TABLE departments;
+
+
+SHOW CREATE TABLE employees;
+
+LOAD DATA  INPATH '/data/departments'
+INTO TABLE departments ;
+
+LOAD DATA LOCAL INPATH '/home/hadoop/department_data.csv'
+INTO TABLE departments ;
+
+LOAD DATA LOCAL INPATH '/home/hadoop/department_data.csv'
+overwrite INTO TABLE departments ;
+
+
+
+_________________________________________________________________________________________________________
+
+CREATE EXTERNAL TABLE IF NOT EXISTS tripdata (
+VendorID	int,
+tpep_pickup_datetime	string,
+tpep_dropoff_datetime	string,
+passenger_count	int,
+trip_distance	double,
+RatecodeID	int,
+store_and_fwd_flag	STRING,
+PULocationID	int,
+DOLocationID	int,
+payment_type	int,
+fare_amount	 double,
+extra	double,
+mta_tax double,
+tip_amount	double,
+tolls_amount	double,
+improvement_surcharge double,
+total_amount double
+)
+ROW FORMAT DELIMITED 
+FIELDS TERMINATED BY ','
+lines terminated by '\n' 
+LOCATION'/inputdata/'
+TBLPROPERTIES ("skip.header.line.count"="1");
+
+SELECT * FROM tripdata LIMIT 20;
+
+SHOW CREATE TABLE tripdata;
+
+DROP TABLE tripdata;
+
+
+CREATE EXTERNAL TABLE IF NOT EXISTS hr_employees(
+Name STRING COMMENT 'Employee Full name',
+`Job Titles` STRING COMMENT 'Job Title',
+Department	STRING COMMENT 'Departement Name',
+`Full or Part-Time` STRING COMMENT 'Contract Type',
+`Salary or Hourly` STRING COMMENT 	'Payroll',
+`Typical Hours` INT COMMENT 'Working hours',
+`Annual Salary` INT COMMENT 'Annual Salary of the employee over 12 months',
+`Hourly Rate` DOUBLE COMMENT 'Hourly Rate'
+)
+--ROW FORMAT FIELDS TERMINATED BY ','
+ROW FORMAT SERDE 'org.apache.hadoop.hive.serde2.OpenCSVSerde'
+WITH SERDEPROPERTIES (
+   "separatorChar" = "\,",
+   "quoteChar"     ='\"'
+)
+LOCATION '/data/employee/'
+TBLPROPERTIES ("skip.header.line.count"="1");
+
+SHOW CREATE TABLE hr_employees;
+
+SELECT * FROM hr_employees LIMIT 100 ;
+
+CREATE TABLE IF NOT EXISTS managers
+LIKE hr_employees;
+
+CREATE TABLE IF NOT EXISTS managers_2
+LIKE hr_employees
+location '/temp/managers';
+
+ALTER TABLE hr_employees 
+SET location '/temp/employees';
+
+SELECT * FROM managers;
