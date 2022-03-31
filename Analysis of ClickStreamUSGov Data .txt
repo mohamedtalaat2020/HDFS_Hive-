@@ -1,0 +1,128 @@
+# schema of clickstream data from us government websites 
+
+{
+"a": USER_AGENT,
+"c": COUNTRY_CODE, # 2-character iso code
+"nk": KNOWN_USER, # 1 or 0. 0=this is the first time we've seen this browser
+"g": GLOBAL_BITLY_HASH,
+"h": ENCODING_USER_BITLY_HASH,
+"l": ENCODING_USER_LOGIN,
+"hh": SHORT_URL_CNAME,
+"r": REFERRING_URL,
+"u": LONG_URL,
+"t": TIMESTAMP,
+"gr": GEO_REGION,
+"ll": [LATITUDE, LONGITUDE],
+"cy": GEO_CITY_NAME,
+"tz": TIMEZONE # in http://en.wikipedia.org/wiki/Zoneinfo format
+"hc": TIMESTAMP OF TIME HASH WAS CREATED,
+"al": ACCEPT_LANGUAGE http://www.w3.org/Protocols/rfc2616/rfc2616-sec14.html#sec14.4
+}
+
+_________________________________________
+
+
+CREATE TABLE clickstrnew(a string, c string, nk int, tz string, gr string, g string, h string,l string, hh string, r string, u string,
+t int, hc int, cy string, al string) ROW FORMAT SERDE 'org.apache.hive.hcatalog.data.JsonSerDe'
+stored as textfile;
+
+
+___________________
+CREATE TABLE clickstr
+(a string, c string, nk int, tz string, gr string, g string, h string,l string, hh string, r string, u string,t int, hc int, cy string, al string) 
+STORED AS TEXTFILE ;
+ 
+org.apache.hadoop.hive.serde2.DelimitedJSONSerDe
+org.apache.hadoop.hive.serde2.jsonserde
+org.openx.data.jsonserde.JsonSerDe
+
+dfs -put ClickStreamUSGovernmentWebsites.txt /input/streamdata/
+LOAD DATA  INPATH '/input/streamdata/ClickStreamUSGovernmentWebsites.txt' OVERWRITE INTO TABLE clickstrnew;
+
+____________________________________________________________________________________________________________________________-
+CREATE TABLE clickstr (str string) 
+STORED AS TEXTFILE ;
+
+
+dfs -put ClickStreamUSGovernmentWebsites.txt /input/streamdata/
+LOAD DATA  INPATH '/input/streamdata/ClickStreamUSGovernmentWebsites.txt' OVERWRITE INTO TABLE clickstrnew;
+
+
+--select get_json_object(str,'$.c'),get_json_object(str,'$.u') , count(*) from clickstr group by get_json_object(str,'$.c'),get_json_object(str,'$.u')
+ order by count(*) limit 10; 
+
+
+--select get_json_object(str,'$.c'),get_json_object(str,'$.u'),count(*) from clickstr  group by get_json_object(str,'$.c'),get_json_object(str,'$.u') 
+order by count(*) limit 5;
+
+CREATE EXTERNAL TABLE IF NOT EXISTS clickstrpart 
+(a string, nk int,g string, h string,l string,hh string, r string ,u string, t string,gr string, cy string, tz string,hc string,al string) 
+PARTITIONED BY (c string) 
+ROW FORMAT DELIMITED FIELDS TERMINATED BY '\t'
+LOCATION '/user/hive/warehouse/it/clickstrpart';
+
+SET hive.exec.dynamic.partition=true
+set hive.exec.dynamic.partition.mode=nonstrict
+
+INSERT OVERWRITE TABLE clickstrpart PARTITION(c)
+SELECT 
+get_json_object(str,'$.a'),
+cast('get_json_object(str,'$.nk')' as int),
+get_json_object(str,'$.g'),
+get_json_object(str,'$.h'),
+get_json_object(str,'$.I'),
+get_json_object(str,'$.hh'),
+get_json_object(str,'$.r'),
+get_json_object(str,'$.u'),
+cast('get_json_object(str,'$.t')' as int),
+get_json_object(str,'$.gr'),
+get_json_object(str,'$.cy'),
+get_json_object(str,'$.tz'),
+cast('get_json_object(str,'$.hc')' as int),
+get_json_object(str,'$.al'),
+get_json_object(str,'$.c')
+FROM clickstr;
+
+
+
+# Click stream Analysis # 
+Click streams obtained from US government web sites .
+ task is to store this data on Hadoop and compute the following analytics:
+    > The top 10 most popular sites in terms of clicks that belong to country ?. 
+    > The top-10 most popular sites for each country.
+    > Top-10 most popular sites for each month.
+
+ 1- The top 10 sites in terms of clicks is:
+SELECT c,u,count(*)  from clickstrpart GROUP BY c,u ORDER BY count(*) DESC LIMIT 10; 
+
+
+
+2-  The top-10 most popular sites for each country :
+
+
+
+SELECT c,u,cnt
+FROM
+(
+SELECT *, rank(c)  over (partition by c order by cnt DESC) as Rank
+FROM (
+select c,u,count(*) as cnt from clickstrpart group by c,u order by c,cnt DESC
+) A
+) B
+WHERE Rank <= 10
+order by c,cnt DESC;
+
+
+3- Top-10 most popular sites for each month
+
+
+SELECT mon,u,cnt
+FROM
+(
+SELECT *, rank(mon) over (partition by mon order by cnt DESC) as row_number
+FROM (
+select month(FROM_UNIXTIME(cast(hc as bigint))) as mon,u,count(*) as cnt from clickstrpart group by mon,u order by mon,cnt DESC
+) A
+) B
+WHERE row_number <= 10 
+order by mon ,cnt DESC;
